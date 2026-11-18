@@ -109,7 +109,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libglib2.0-0 \
         libmagic1 \
         libsndfile1 \
+        build-essential \
+        python3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# WHY A COMPILER IS NEEDED AT RUNTIME (learned the hard way on a rented 3090):
+# the first generation died twice before a single frame was drawn.
+#   1. `RuntimeError: Failed to find C compiler` -- triton 3.7.1 compiles its
+#      CUDA launcher stub (triton/backends/nvidia/driver.py -> CudaUtils) with
+#      `cc` the first time any Triton kernel runs. torch 2.13 routes
+#      `torch.ops._native.bmm_outer_product` (used by Gemma-4's RoPE inside the
+#      text encoder) through a Triton kernel, so this fires on the FIRST forward
+#      pass, before any diffusion step.
+#   2. With gcc installed it then failed `fatal error: Python.h: No such file or
+#      directory` -- the runtime stage installed python3 but not python3-dev, so
+#      the launcher could not be compiled as a CPython extension.
+# Both are silent at build time (the CI smoke test only imports the modules; no
+# kernel is launched without a GPU). `ltx2-doctor` now checks for both.
 
 # Copy the resolved workspace and virtualenv from the builder.
 COPY --from=builder /opt/ltx2 /opt/ltx2
