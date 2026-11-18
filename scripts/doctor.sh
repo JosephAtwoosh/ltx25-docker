@@ -64,6 +64,28 @@ else
   python "${LTX_SCRIPTS_DIR:-/opt/ltx2-docker/scripts}/check_libs.py" || FAILS=$((FAILS+1))
 fi
 
+# ------------------------------------------------------------------ toolchain
+# Triton compiles its CUDA launcher with a C compiler the first time a Triton
+# kernel runs, and needs Python.h to build it as a CPython extension. torch 2.13
+# routes bmm_outer_product (Gemma-4 RoPE, i.e. the very first forward pass of the
+# text encoder) through Triton, so without these the first generation dies with
+# "Failed to find C compiler" or "Python.h: No such file or directory" -- after
+# the weights have been downloaded.
+echo
+echo "Toolchain (Triton needs these at runtime)"
+CC_BIN="$(command -v cc || command -v gcc || true)"
+if [ -n "${CC_BIN}" ]; then
+  ok "C compiler: $(printf '%s' "${CC_BIN}") ($("${CC_BIN}" --version 2>/dev/null | head -n1))"
+else
+  fail "no C compiler (cc/gcc). Triton compiles its CUDA launcher at runtime, so every generation fails at the first op. Install gcc (build-essential)."
+fi
+PY_HDR="$(python -c 'import os,sysconfig; print(os.path.join(sysconfig.get_paths()["include"], "Python.h"))' 2>/dev/null)"
+if [ -n "${PY_HDR}" ] && [ -f "${PY_HDR}" ]; then
+  ok "Python.h: ${PY_HDR}"
+else
+  fail "Python.h missing (python3-dev). Triton cannot compile its launcher as a CPython extension; generation fails at the first op."
+fi
+
 # -------------------------------------------------------------------- memory
 echo
 echo "System memory"
