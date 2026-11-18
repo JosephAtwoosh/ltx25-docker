@@ -22,16 +22,20 @@ FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS builder
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG UV_VERSION=0.9.30
 # Pin the upstream source so the image is reproducible. Bump deliberately.
 ARG LTX_REPO=https://github.com/Lightricks/LTX-2.git
 ARG LTX_REF=main
 
+# The nvidia/cuda images contain NO Python (the Ubuntu base ships none). Install it
+# with apt and point uv at it explicitly, so the venv is built against
+# /usr/bin/python3.x -- an interpreter that also exists in the runtime stage.
+# Do NOT set UV_PYTHON_DOWNLOADS=never without a system interpreter: uv then fails
+# with exit code 2 ("no interpreter found").
 ENV PIP_NO_CACHE_DIR=1 \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    UV_PYTHON_DOWNLOADS=never \
-    UV_PROJECT_ENVIRONMENT=/opt/ltx2/.venv
+    UV_PROJECT_ENVIRONMENT=/opt/ltx2/.venv \
+    UV_PYTHON=/usr/bin/python3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -39,6 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         build-essential \
         pkg-config \
+        python3 \
+        python3-dev \
+        python3-venv \
         libgl1 \
         libglib2.0-0 \
         ffmpeg \
@@ -82,11 +89,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+# PYTHONUNBUFFERED: log lines appear as they happen.
+# PYTORCH_CUDA_ALLOC_CONF: reduces fragmentation / OOM on the big 22B transformer
+#   (upstream advice).
+# TOKENIZERS_PARALLELISM: off, or the 12B Gemma tokenizers spawn a process per core.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    # Reduces fragmentation / OOM on the big 22B transformer (upstream advice).
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-    # Off, or 12B Gemma tokenizers spawn a process per core.
     TOKENIZERS_PARALLELISM=false \
     HF_HOME=/models/.hf \
     UV_PROJECT_ENVIRONMENT=/opt/ltx2/.venv \
@@ -95,6 +104,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         ffmpeg \
+        python3 \
         libgl1 \
         libglib2.0-0 \
         libmagic1 \
