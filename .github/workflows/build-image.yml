@@ -30,7 +30,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/ltx25
+  IMAGE: ghcr.io/josephatwoosh/ltx25
 
 jobs:
   build:
