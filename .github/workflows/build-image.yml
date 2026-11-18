@@ -74,12 +74,42 @@ jobs:
           push: true
           build-args: |
             LTX_REF=${{ github.event.inputs.ltx_ref || 'main' }}
+          # Single platform and NO attestations, so the tag is a plain image
+          # manifest instead of an OCI index. An index makes the tag a two-step
+          # pull (index -> child manifest by digest), and the run that produced
+          # :cu132 left an index whose amd64 child returned MANIFEST_UNKNOWN from
+          # GHCR, i.e. `docker pull` failed even though the tag "existed".
+          # A direct manifest also makes the printed digest a stable thing for a
+          # Vast template to pin.
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
           tags: |
             ${{ env.IMAGE }}:${{ github.event.inputs.tag || 'cu132' }}
             ${{ env.IMAGE }}:sha-${{ github.sha }}
           # mode=min: the gha cache competes for the same 72 GB disk as the build.
           cache-from: type=gha
           cache-to: type=gha,mode=min
+
+      # Pull the pushed reference back out of GHCR, which is exactly what a Vast
+      # host will do. Run #3 was green while the tag was unpullable (the index's
+      # amd64 child returned MANIFEST_UNKNOWN), so a successful push is not
+      # evidence of a usable image; only a real pull is.
+      - name: Verify the pushed image pulls back
+        run: |
+          set -eux
+          TAG="${{ github.event.inputs.tag || 'cu132' }}"
+          docker pull "${IMAGE}:${TAG}"
+          DIGESTS=$(docker image inspect "${IMAGE}:${TAG}" \
+            --format '{{range .RepoDigests}}{{println .}}{{end}}')
+          echo "${DIGESTS}"
+          {
+            echo "### Verified: the pushed image pulls"
+            echo
+            echo '```'
+            echo "${DIGESTS}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Proves the image runs and that its Python stack imports, without a GPU.
       - name: Smoke test
