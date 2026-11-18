@@ -1,0 +1,10 @@
+# Files that must not enter the build context.
+.git
+**/__pycache__
+**/*.pyc
+.venv
+models
+output
+*.mp4
+*.log
+.env

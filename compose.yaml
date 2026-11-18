@@ -1,0 +1,67 @@
+# docker compose file for LTX-2.5 (CUDA 13.2, 24 GB-class GPU profile).
+#
+#   docker compose build
+#   docker compose run --rm ltx2                              # preflight report
+#   docker compose run --rm ltx2 run                          # generate with defaults
+#   docker compose run --rm ltx2 run --height 1024 --width 1536 --enhance-prompt
+#   docker compose run --rm ltx2 shell                        # interactive shell
+#   docker compose --profile download run --rm downloader     # fetch weights (needs HF_TOKEN)
+#
+# On Windows/Git Bash prefer scripts/run.sh, which sets the MSYS path-conversion
+# env vars for you. Host paths are configurable via .env (see .env.example).
+services:
+  ltx2:
+    build:
+      context: .
+      args:
+        LTX_REF: ${LTX_REF:-main}
+    image: ltx2.5:cu132
+    init: true
+    stdin_open: true
+    tty: true
+    shm_size: "16gb"
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    environment:
+      # Shared with the downloader so the HF cache is reused, not re-fetched.
+      HF_HOME: /models
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+      TOKENIZERS_PARALLELISM: "false"
+      HF_TOKEN: ${HF_TOKEN:-}
+      HEIGHT: ${HEIGHT:-768}
+      WIDTH: ${WIDTH:-1280}
+      NUM_FRAMES: ${NUM_FRAMES:-121}
+      QUANTIZATION: ${QUANTIZATION:-fp8-cast}
+      OFFLOAD: ${OFFLOAD:-cpu}
+    volumes:
+      # /models is the HF local-dir root, so weights land at /models/diffusion_models/...
+      - ${MODELS_HOST_DIR:-./models/ltx-2.5}:/models
+      - ${OUTPUT_HOST_DIR:-./output}:/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  downloader:
+    image: python:3.12-slim
+    profiles: ["download"]
+    working_dir: /work
+    environment:
+      HF_TOKEN: ${HF_TOKEN:?set HF_TOKEN to a Read token with gated-repo access}
+      HF_HOME: /models
+      INCLUDE_DFR: ${INCLUDE_DFR:-0}
+      INCLUDE_DURATION_HEAD: ${INCLUDE_DURATION_HEAD:-0}
+      HF_MAX_WORKERS: ${HF_MAX_WORKERS:-}
+    volumes:
+      - ./scripts:/work/scripts:ro
+      - ${MODELS_HOST_DIR:-./models/ltx-2.5}:/models
+    command:
+      - bash
+      - -lc
+      - |
+        pip install --no-cache-dir -q -U "huggingface_hub[hf]" \
+        && MODELS_DIR=/models bash /work/scripts/download-models.sh

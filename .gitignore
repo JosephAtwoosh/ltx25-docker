@@ -1,0 +1,8 @@
+# Weights and generated media never belong in git.
+models/
+output/
+*.mp4
+*.safetensors
+
+# Local secrets and env.
+.env
