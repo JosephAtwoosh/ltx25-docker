@@ -133,8 +133,24 @@ if [ -d "${MODELS_DIR}" ]; then
   check_file "${MODELS_DIR}/vae/ltx-2.5-video-vae-bf16.safetensors" 1000000000 "video VAE"
   check_file "${MODELS_DIR}/vae/ltx-2.5-audio-vae-bf16.safetensors" 300000000 "audio VAE"
   check_file "${MODELS_DIR}/latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors" 900000000 "spatial upscaler"
+  # a2vid needs a DIFFERENT transformer from the distilled pipeline: stage 1 runs
+  # the full 22B model and stage 2 refines with a distilled LoRA. Absent files are
+  # informational (the distilled path still works), not a blocker.
+  echo
+  echo "a2vid extras (optional)"
+  for f in \
+    "${MODELS_DIR}/diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors" \
+    "${MODELS_DIR}/loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors"; do
+    if [ -f "$f" ]; then
+      ok "a2vid: $(basename "$f")"
+    else
+      info "not present: $(basename "$f") — fetch with INCLUDE_A2VID=1 ./scripts/run.sh download"
+    fi
+  done
+
   echo
   info "Run 'ltx2-run --help' (or 'docker compose run --rm ltx2 run --help') for the distilled CLI."
+  info "For audio-driven video: 'ltx2-a2vid --audio /audio/clip.wav'."
 else
   fail "${MODELS_DIR} does not exist. Mount the models volume: -v <host>/models:/models"
 fi

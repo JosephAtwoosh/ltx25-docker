@@ -118,6 +118,12 @@ jobs:
           TAG="${{ github.event.inputs.tag || 'cu132' }}"
           docker run --rm "${IMAGE}:${TAG}" \
             python -c "import torch, ltx_pipelines, sys; print('torch', torch.__version__, '| cuda build', torch.version.cuda); print('ok')"
+          # Every upstream module must at least construct its CLI. a2vid is the
+          # audio-driven path; a missing/renamed module fails here, not on a
+          # rented GPU with 122 GiB of weights loaded.
+          docker run --rm "${IMAGE}:${TAG}" \
+            python -m ltx_pipelines.a2vid_two_stage --help > /dev/null
+          docker run --rm "${IMAGE}:${TAG}" ltx2-a2vid --help > /dev/null
 
       - name: Summary
         run: |

@@ -5,6 +5,7 @@
 #   doctor           -> preflight report
 #   shell            -> interactive bash
 #   run [args...]    -> ltx2-run (distilled text-to-video) with args appended
+#   a2vid [args...]  -> ltx2-a2vid (audio-driven two-stage) with args appended
 #   <anything else>  -> executed as-is (e.g. python -m ltx_pipelines.dfr_pipeline ...)
 set -euo pipefail
 
@@ -21,6 +22,10 @@ case "${1:-doctor}" in
   run)
     shift
     exec /usr/local/bin/ltx2-run "$@"
+    ;;
+  a2vid)
+    shift
+    exec /usr/local/bin/ltx2-a2vid "$@"
     ;;
   *)
     exec "$@"

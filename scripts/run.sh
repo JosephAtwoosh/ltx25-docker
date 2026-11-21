@@ -5,6 +5,7 @@
 #   ./scripts/run.sh build        # build the image
 #   ./scripts/run.sh download     # fetch weights (requires HF_TOKEN)
 #   ./scripts/run.sh run          # generate with the 24 GB defaults
+#   ./scripts/run.sh a2vid --audio /audio/clip.wav   # audio-driven video
 #   ./scripts/run.sh run --height 1024 --width 1536 --num-frames 97
 #   ./scripts/run.sh shell        # interactive shell in the image
 #   ./scripts/run.sh <cmd...>     # anything else is passed to the container verbatim

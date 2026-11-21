@@ -1,6 +1,7 @@
 # Weights and generated media never belong in git.
 models/
 output/
+audio/
 *.mp4
 *.safetensors
 

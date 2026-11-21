@@ -137,6 +137,7 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 COPY --chmod=0755 scripts/entrypoint.sh /usr/local/bin/ltx2-entrypoint
 COPY --chmod=0755 scripts/doctor.sh /usr/local/bin/ltx2-doctor
 COPY --chmod=0755 scripts/run-distilled.sh /usr/local/bin/ltx2-run
+COPY --chmod=0755 scripts/run-a2vid.sh /usr/local/bin/ltx2-a2vid
 COPY --chmod=0644 scripts/check_libs.py /usr/local/bin/ltx2-check-libs
 
 # Weights live outside the image; outputs are written to /output.

@@ -9,9 +9,11 @@
 #   ./scripts/download-models.sh                 # distilled set (~71 GiB)
 #   INCLUDE_DFR=1 ./scripts/download-models.sh   # + DFR detailing IC-LoRA (+0.3 GiB)
 #   INCLUDE_DURATION_HEAD=1 ...                  # + auto-duration head (+4 MB)
+#   INCLUDE_A2VID=1 ...                          # + full dev transformer + distilled
+#                                                #   LoRA for a2vid (+~51 GiB)
 #
 # Env: HF_TOKEN, MODELS_DIR, HF_CLI (default: hf, falls back to huggingface-cli),
-#      MODEL_REPO, HF_MAX_WORKERS, INCLUDE_DFR, INCLUDE_DURATION_HEAD
+#      MODEL_REPO, HF_MAX_WORKERS, INCLUDE_DFR, INCLUDE_DURATION_HEAD, INCLUDE_A2VID
 set -euo pipefail
 
 MODELS_DIR="${MODELS_DIR:-./models/ltx-2.5}"
@@ -49,6 +51,15 @@ FILES=(
 )
 if [ "${INCLUDE_DURATION_HEAD:-0}" = "1" ]; then
   FILES+=("model_patches/ltx-2.5-duration-head-bf16.safetensors")
+fi
+# a2vid (audio-to-video) stage 1 runs the FULL transformer, not the distilled one,
+# and stage 2 refines with the distilled LoRA. Both are required by
+# ltx_pipelines.a2vid_two_stage; without them the wrapper refuses to start.
+if [ "${INCLUDE_A2VID:-0}" = "1" ]; then
+  FILES+=(
+    "diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors"
+    "loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors"
+  )
 fi
 
 echo "Downloading LTX-2.5 -> ${MODELS_DIR}"

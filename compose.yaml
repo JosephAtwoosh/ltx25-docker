@@ -3,6 +3,7 @@
 #   docker compose build
 #   docker compose run --rm ltx2                              # preflight report
 #   docker compose run --rm ltx2 run                          # generate with defaults
+#   docker compose run --rm ltx2 a2vid --audio /audio/clip.wav  # audio-driven video
 #   docker compose run --rm ltx2 run --height 1024 --width 1536 --enhance-prompt
 #   docker compose run --rm ltx2 shell                        # interactive shell
 #   docker compose --profile download run --rm downloader     # fetch weights (needs HF_TOKEN)
@@ -34,10 +35,14 @@ services:
       NUM_FRAMES: ${NUM_FRAMES:-121}
       QUANTIZATION: ${QUANTIZATION:-fp8-cast}
       OFFLOAD: ${OFFLOAD:-cpu}
+      AUDIO: ${AUDIO:-}
     volumes:
       # /models is the HF local-dir root, so weights land at /models/diffusion_models/...
       - ${MODELS_HOST_DIR:-./models/ltx-2.5}:/models
       - ${OUTPUT_HOST_DIR:-./output}:/output
+      # a2vid conditioning audio, read-only. Put clips in <AUDIO_HOST_DIR> and pass
+      # --audio /audio/<name>.wav (or set AUDIO=/audio/<name>.wav).
+      - ${AUDIO_HOST_DIR:-./audio}:/audio:ro
     deploy:
       resources:
         reservations:
@@ -55,6 +60,7 @@ services:
       HF_HOME: /models
       INCLUDE_DFR: ${INCLUDE_DFR:-0}
       INCLUDE_DURATION_HEAD: ${INCLUDE_DURATION_HEAD:-0}
+      INCLUDE_A2VID: ${INCLUDE_A2VID:-0}
       HF_MAX_WORKERS: ${HF_MAX_WORKERS:-}
     volumes:
       - ./scripts:/work/scripts:ro

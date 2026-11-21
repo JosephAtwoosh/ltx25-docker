@@ -25,7 +25,8 @@ CLI) in a CUDA 13.2 image, keeps the ~71 GiB of gated weights on a mounted volum
 | Docker | Docker Engine 24+, NVIDIA Container Toolkit, `docker compose` v2 | — |
 
 Rough disk budget: image ~15 GB + weights ~71 GiB (76 GB) + HF cache/working space. Keep **120 GB+**
-free to be comfortable.
+free to be comfortable. The a2vid path adds the full dev transformer and a distilled LoRA
+(**+~51 GiB**, so ~300 GB free in total); see [Audio-driven video](#audio-driven-video-a2vid).
 
 ### Why CUDA 13.2 and not something older?
 
@@ -169,7 +170,35 @@ docker compose run --rm ltx2 shell            # interactive, venv already active
 
 Available modules include `distilled`, `dfr_pipeline`, `ti2vid_two_stages`, `ti2vid_two_stages_hq`,
 `ti2vid_one_stage`, `ic_lora`, `a2vid_two_stage`, `retake`, `dubit`, `t2a_one_stage`,
-`hdr_ic_lora`, plus `*_mgpu` variants.
+`hdr_ic_lora`, plus `*_mgpu` variants. Several of them need weights this repo does not fetch by
+default — check the module's `--help` and its required `--*-path` arguments before running it.
+
+---
+
+## Audio-driven video (a2vid)
+
+`A2VidPipelineTwoStage` generates video conditioned on an audio clip. It is wrapped as
+`ltx2-a2vid` and needs **two extra weight files** the distilled profile does not use:
+
+| File | Size | Why |
+|---|---|---|
+| `diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors` | ~42 GB | stage 1 denoises with the **full** model (CFG + STG) |
+| `loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors` | ~8.9 GB | `--distilled-lora` is required; it drives the stage-2 refine |
+
+```bash
+INCLUDE_A2VID=1 ./scripts/run.sh download            # 5 distilled files + these 2 (~122 GiB)
+mkdir -p audio && cp /path/to/clip.wav audio/        # mounted read-only at /audio
+./scripts/run.sh a2vid --audio /audio/clip.wav
+```
+
+Pass `--image clip.jpg [FRAME [STRENGTH]]` to pin a start still at frame 0 — the analogue of a
+Wan `start.jpg`; omit it for pure audio-to-video. The 48 GB class (L40S / A6000 / A100) is the
+comfortable tier; on 24-32 GB drop to
+`--height 768 --width 1280` or lower first. Because the frame count follows the audio
+(`--audio-max-duration`) or `--num-frames`, a long clip at full resolution is the easiest way
+to run out of memory — start with a ~5 s clip. `--height`/`--width` here are the **stage-2**
+size; stage 1 runs at half. See [docs/A2VID-TEST.md](docs/A2VID-TEST.md) for a rented-GPU
+runbook and the driver/disk requirements.
 
 ---
 
@@ -212,12 +241,17 @@ ltx25-docker/
 ├── .dockerignore
 ├── .gitattributes              # forces LF on scripts
 ├── scripts/
-│   ├── run.sh                  # host wrapper: build/download/doctor/run/shell
-│   ├── download-models.sh      # gated HF weight download (~71 GiB)
+│   ├── run.sh                  # host wrapper: build/download/doctor/run/a2vid/shell
+│   ├── download-models.sh      # gated HF weight download (~71 GiB, +51 GiB with a2vid)
 │   ├── run-distilled.sh        # in-container DistilledPipeline wrapper (24 GB defaults)
+│   ├── run-a2vid.sh            # in-container A2VidPipelineTwoStage wrapper (audio-driven)
 │   ├── doctor.sh               # in-container preflight
 │   ├── check_libs.py           # torch/natten/CUDA capability checks
-│   └── entrypoint.sh           # doctor | shell | run | <cmd>
+│   └── entrypoint.sh           # doctor | shell | run | a2vid | <cmd>
+├── docs/
+│   ├── VAST.md                 # build -> push -> rent on Vast.ai
+│   └── A2VID-TEST.md           # a2vid on a rented GPU: weights, driver, disk
+├── audio/                      # a2vid conditioning clips (gitignored, host volume)
 ├── models/ltx-2.5/             # weights land here (gitignored, host volume)
 └── output/                     # generated mp4s (gitignored, host volume)
 ```
